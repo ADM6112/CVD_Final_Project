@@ -62,6 +62,7 @@ The pipeline will auto-create subfolders it writes to — you only need to creat
 
 The following files are **not included in this repo** due to size.  
 Download them from **[https://drive.google.com/drive/folders/0ALhcrDeWOPhYUk9PVA?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto]** and place them in the correct folders above.
+You will need to request access(files were too big. I will approve it ASAP)
 
 | File | Destination | Created by |
 |------|-------------|------------|
