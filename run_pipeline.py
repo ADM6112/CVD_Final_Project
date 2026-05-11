@@ -56,10 +56,10 @@ import importlib
 RUN_STEP_0        = False   # Master switch — set True to enable clean
 RUN_STEP_0_CONFIRM= False   # Second confirmation failsafe — also set True
 
-RUN_STEP_1 = False   # Parse .gz ITCH files → raw CSVs
-RUN_STEP_2 = False   # Split raw CSVs → per-stock files
-RUN_STEP_3 = True   # Build feature matrix (with split tags)
-RUN_STEP_4 = True   # Train XGBoost models
+RUN_STEP_1 = False   # Parse .gz ITCH files → raw CSVs  (skipped — raw_csv/ provided)
+RUN_STEP_2 = True    # Split raw CSVs → per-stock files
+RUN_STEP_3 = True    # Build feature matrix (with split tags)
+RUN_STEP_4 = True    # Train XGBoost models
 RUN_STEP_5 = True    # Walk-forward simulation on test days
 RUN_STEP_6 = True    # Full model analysis + charts
 
@@ -80,6 +80,12 @@ SPLIT_FOLDERS = {
 # =========================================================
 def check_split_folders():
     from pathlib import Path
+
+    # If Step 1 is not running, .gz files are not needed — skip this check entirely
+    if not RUN_STEP_1:
+        print("Skipping .gz file check (RUN_STEP_1 = False)\n")
+        return
+
     print("Checking split folder structure...")
     total = 0
     for label, folder in SPLIT_FOLDERS.items():
@@ -107,6 +113,73 @@ def check_split_folders():
 
 
 # =========================================================
+# INPUT FILE CHECKS — only checks what the first enabled step needs
+# =========================================================
+def check_inputs():
+    from pathlib import Path
+    from config import RAW_CSV_DIR, SPLIT_DIR, FEATURES_FILE, MODEL_DIR
+
+    errors = []
+
+    # Step 2 needs raw_csv/
+    if RUN_STEP_2 and not RUN_STEP_1:
+        if not Path(RAW_CSV_DIR).exists() or not any(Path(RAW_CSV_DIR).glob("*.csv")):
+            errors.append(
+                f"  Step 2 needs raw_csv/ CSVs but none found at:\n"
+                f"    {RAW_CSV_DIR}\n"
+                f"  Download raw_csv.zip from the shared link and extract it there."
+            )
+
+    # Step 3 needs split_by_stock/
+    if RUN_STEP_3 and not RUN_STEP_2:
+        if not Path(SPLIT_DIR).exists() or not any(Path(SPLIT_DIR).glob("*.csv")):
+            errors.append(
+                f"  Step 3 needs split_by_stock/ CSVs but none found at:\n"
+                f"    {SPLIT_DIR}\n"
+                f"  Either enable RUN_STEP_2 or provide the split_by_stock/ folder."
+            )
+
+    # Step 4 needs clean_features.csv
+    if RUN_STEP_4 and not RUN_STEP_3:
+        if not Path(FEATURES_FILE).exists():
+            errors.append(
+                f"  Step 4 needs clean_features.csv but it was not found at:\n"
+                f"    {FEATURES_FILE}\n"
+                f"  Either enable RUN_STEP_3 or provide the file directly."
+            )
+
+    # Step 5 needs models from step 4
+    if RUN_STEP_5 and not RUN_STEP_4:
+        missing = [f for f in ["direction_model.ubj", "hold_model.ubj", "split_info.json"]
+                   if not Path(MODEL_DIR, f).exists()]
+        if missing:
+            errors.append(
+                f"  Step 5 needs model files but these are missing from {MODEL_DIR}:\n"
+                f"    {', '.join(missing)}\n"
+                f"  Either enable RUN_STEP_4 or provide the model files directly."
+            )
+
+    # Step 6 needs sim output from step 5
+    if RUN_STEP_6 and not RUN_STEP_5:
+        missing = [f for f in ["sim_trades.csv", "equity_curve.csv"]
+                   if not Path(MODEL_DIR, f).exists()]
+        if missing:
+            errors.append(
+                f"  Step 6 needs simulation outputs but these are missing from {MODEL_DIR}:\n"
+                f"    {', '.join(missing)}\n"
+                f"  Either enable RUN_STEP_5 or provide the files directly."
+            )
+
+    if errors:
+        print("=" * 60)
+        print("ERROR — Missing required input files:")
+        print("=" * 60)
+        for e in errors:
+            print(e)
+        sys.exit(1)
+
+
+# =========================================================
 # MAIN
 # =========================================================
 def run():
@@ -118,6 +191,7 @@ def run():
     print()
 
     check_split_folders()
+    check_inputs()
 
     # ----------------------------------------------------------
     # STEP 0 — Clean slate (double confirmation required)
